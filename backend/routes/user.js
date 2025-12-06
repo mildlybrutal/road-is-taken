@@ -98,5 +98,26 @@ userRouter.post("/sign-in", async function (req, res) {
 	}
 });
 
+userRouter.post("/update-score", async (req, res) => {
+	try {
+		const { score, level } = req.body;
+		const userId = req.userId;
+
+		await userModel.findByIdAndUpdate(userId, {
+			quizScore: score,
+			level: level,
+		});
+
+		res.json({
+			status: 200,
+			message: "Score updated",
+		});
+	} catch (error) {
+		res.json({
+			status: 500,
+			message: "Error updating score",
+		});
+	}
+});
 
 export default userRouter;

@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import questionRouter from "./routes/questions";
+import { questionModel } from "./db/db";
 
 const questions = [
 	// --- LEVEL 1: EASY ---
@@ -215,10 +216,10 @@ const seedDB = async () => {
 		await mongoose.connect(process.env.MONGO_URI);
 		console.log("Connected to DB");
 
-		await questionRouter.deleteMany({ domain: "frontend_react" });
+		await questionModel.deleteMany({ domain: "frontend_react" });
 		console.log("Cleared old questions");
 
-		await questionRouter.insertMany(questions);
+		await questionModel.insertMany(questions);
 		console.log("Seeded 15 React Questions successfully");
 
 		mongoose.connection.close();
