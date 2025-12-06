@@ -98,6 +98,8 @@ userRouter.post("/sign-in", async function (req, res) {
 	}
 });
 
+userRouter.use(userMiddleware);
+
 userRouter.post("/update-score", async (req, res) => {
 	try {
 		const { score, level } = req.body;
@@ -116,6 +118,28 @@ userRouter.post("/update-score", async (req, res) => {
 		res.json({
 			status: 500,
 			message: "Error updating score",
+		});
+	}
+});
+
+userRouter.get("/me", async (req, res) => {
+	try {
+		const user = await userModel.findById(req.userId).select("-password");
+		if (!user) {
+			return res.json({
+				status: 404,
+				message: "User not found",
+			});
+		}
+
+		res.json({
+			status: 200,
+			user: user,
+		});
+	} catch (error) {
+		res.json({
+			status: 500,
+			message: "Server error fetching user",
 		});
 	}
 });

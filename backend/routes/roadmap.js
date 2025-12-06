@@ -178,4 +178,25 @@ roadmapRouter.put("/update", async (req, res) => {
 	}
 });
 
+roadmapRouter.get("/all", async (req, res) => {
+	try {
+		const roadmaps = await roadmapModel
+			.find({
+				user: req.userId,
+			})
+			.sort({ createdAt: -1 });
+
+		res.json({
+			status: 200,
+			message: "Roadmaps fetched successfully",
+			roadmaps: roadmaps || [],
+		});
+	} catch (error) {
+		res.json({
+			status: 500,
+			message: "Error fetching roadmaps",
+		});
+	}
+});
+
 export default roadmapRouter;
