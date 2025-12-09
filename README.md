@@ -1,7 +1,3 @@
-Here is the updated `README.md` file without emojis.
-
------
-
 # Road Is Taken
 
 **Road Is Taken** is an intelligent, personalized learning roadmap generator. Unlike static tutorials, this application uses GenAI to create dynamic Directed Acyclic Graphs (DAGs) for learning new technologies. It tailors the roadmap based on your current skill level, quiz performance, and verified skills fetched directly from your GitHub repository history.
