@@ -1,7 +1,6 @@
+import 'dotenv/config';
 import mongoose from "mongoose";
-import questionRouter from "./routes/questions";
-import { questionModel } from "./db/db";
-
+import { questionModel } from "./db/db.js";
 const questions = [
 	// --- LEVEL 1: EASY ---
 	{
@@ -213,7 +212,7 @@ const questions = [
 
 const seedDB = async () => {
 	try {
-		await mongoose.connect(process.env.MONGO_URI);
+		await mongoose.connect(process.env.MONGODB_URI);
 		console.log("Connected to DB");
 
 		await questionModel.deleteMany({ domain: "frontend_react" });

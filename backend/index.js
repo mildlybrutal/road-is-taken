@@ -1,13 +1,24 @@
 import express from "express";
-import userRouter from "./routes/user";
-import questionRouter from "./routes/questions";
-import userMiddleware from "./middleware/user";
-import githubRouter from "./routes/github";
-import roadmapRouter from "./routes/roadmap";
-
+import userRouter from "./routes/user.js";
+import questionRouter from "./routes/questions.js";
+import userMiddleware from "./middleware/user.js";
+import githubRouter from "./routes/github.js";
+import roadmapRouter from "./routes/roadmap.js";
+import mongoose from "mongoose";
+import cors from "cors";
+import dotenv from "dotenv";
+import cookieParser from "cookie-parser";
+dotenv.config();
 const app = express();
 app.use(express.json());
-app.use(cors());
+app.use(cookieParser());
+app.use(cors({
+	origin: (origin, callback) => {
+		console.log("CORS Origin Request:", origin);
+		callback(null, true);
+	},
+	credentials: true
+}));
 
 app.use("/api/v1/user", userRouter);
 app.use("/api/v1/questions", userMiddleware, questionRouter);
@@ -15,7 +26,7 @@ app.use("/api/v1/fetchGithub", userMiddleware, githubRouter);
 app.use("/api/v1/roadmap", userMiddleware, roadmapRouter);
 
 async function main() {
-	await mongoose.connect(MONGODB_URI);
+	await mongoose.connect(process.env.MONGODB_URI);
 	app.listen(3000, () => {
 		console.log("Server running at port 3000");
 	});

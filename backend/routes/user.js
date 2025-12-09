@@ -1,17 +1,17 @@
 import express, { Router } from "express";
 import { z } from "zod";
 import bcrypt from "bcrypt";
-import { userModel } from "../db/db";
+import { userModel } from "../db/db.js";
 import jwt from "jsonwebtoken";
-import userMiddleware from "../middleware/user";
-import { JWT_USER_PASSWORD } from "../config";
+import userMiddleware from "../middleware/user.js";
+import { JWT_USER_PASSWORD } from "../config.js";
 const userRouter = Router();
 
 userRouter.post("/sign-up", async function (req, res) {
 	try {
 		const requiredBody = z.object({
 			email: z.string().min(3).max(100),
-			password: z.string().min(3).max(10),
+			password: z.string().min(3).max(50),
 			username: z.string().min(3).max(30),
 		});
 
@@ -51,7 +51,7 @@ userRouter.post("/sign-in", async function (req, res) {
 	try {
 		const requiredBody = z.object({
 			email: z.string().min(3).max(100),
-			password: z.string().min(3).max(10),
+			password: z.string().min(3).max(50),
 		});
 
 		const parsedDataWithSuccess = requiredBody.safeParse(req.body);
@@ -69,9 +69,17 @@ userRouter.post("/sign-in", async function (req, res) {
 		const response = await userModel.findOne({
 			email: email,
 		});
+
+		if (!response) {
+			return res.json({
+				status: 403,
+				message: "Invalid credentials",
+			});
+		}
+
 		const checkPassword = await bcrypt.compare(password, response.password);
 
-		if (response && checkPassword) {
+		if (checkPassword) {
 			const token = jwt.sign(
 				{
 					id: response._id.toString(),
@@ -79,15 +87,20 @@ userRouter.post("/sign-in", async function (req, res) {
 				JWT_USER_PASSWORD
 			);
 
+			res.cookie("token", token, {
+				httpOnly: true,
+				secure: false, // Set to true in production with HTTPS
+				sameSite: "lax"
+			});
+
 			return res.json({
 				status: 200,
-				token: token,
 				message: "Sign-in successfull",
 			});
 		} else {
 			return res.json({
 				status: 403,
-				message: "invalid creds",
+				message: "Invalid credentials",
 			});
 		}
 	} catch (error) {

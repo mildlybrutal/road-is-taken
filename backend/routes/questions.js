@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { questionModel } from "../db/db";
+import { questionModel } from "../db/db.js";
 import mongoose from "mongoose";
 
 const questionRouter = Router();
@@ -19,7 +19,7 @@ questionRouter.post("/next", async (req, res) => {
 				// correct -> increase difficulty
 				nextDifficulty = Math.min(3, currentDifficulty + 1);
 			} else {
-				nextDifficulty = Math.min(1, currentDifficulty - 1); // wrong->decrease level
+				nextDifficulty = Math.max(1, currentDifficulty - 1); // wrong->decrease level
 			}
 		} else {
 			nextDifficulty = 2;
@@ -68,6 +68,33 @@ questionRouter.post("/next", async (req, res) => {
 		res.json({
 			status: 500,
 			message: "Error fetching question",
+		});
+	}
+});
+
+questionRouter.post("/node-content", async (req, res) => {
+	try {
+		const { topic, domain } = req.body;
+
+		// Find questions where tags include the topic (case insensitive regex/match)
+		// Or text contains the topic
+		const questions = await questionModel.find({
+			domain: domain,
+			$or: [
+				{ tags: { $in: [new RegExp(topic, "i")] } },
+				{ text: { $regex: topic, $options: "i" } },
+			],
+		});
+
+		res.json({
+			status: 200,
+			questions,
+		});
+	} catch (error) {
+		res.json({
+			status: 500,
+			message: "Error fetching specific content",
+			error: error.message,
 		});
 	}
 });

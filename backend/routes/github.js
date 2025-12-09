@@ -1,12 +1,12 @@
 import axios from "axios";
 import { Router } from "express";
-import { userModel } from "../db/db";
+import { userModel } from "../db/db.js";
 
 const githubRouter = Router();
 
-githubRouter.get("/username", async (req, res) => {
+githubRouter.post("/username", async (req, res) => {
 	const { githubHandle } = req.body;
-	const userId = req.user.Id;
+	const userId = req.userId;
 
 	if (!githubHandle) {
 		res.json({
