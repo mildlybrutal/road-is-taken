@@ -11,7 +11,7 @@ const userSchema = new Schema(
 		githubUsername: { type: String, trim: true },
 		domain: String,
 		level: { type: Number, default: 1, min: 1 },
-		quizScore: { type: Number, default: 0, min: 0 },
+		level: { type: Number, default: 1, min: 1 },
 		githubSkills: [String],
 	},
 	{ timestamps: true }
@@ -59,33 +59,9 @@ const roadmapSchema = new Schema(
 	{ timestamps: true }
 );
 
-const questionSchema = new mongoose.Schema({
-	domain: {
-		type: String,
-		required: true,
-		index: true,
-	},
 
-	difficulty: {
-		type: Number,
-		required: true,
-		min: 1,
-		max: 3,
-	},
-
-	text: { type: String, required: true },
-
-	options: [
-		{
-			text: { type: String, required: true },
-			isCorrect: { type: Boolean, default: false },
-		},
-	],
-	tags: [String],
-});
 
 const userModel = mongoose.model("user", userSchema);
 const roadmapModel = mongoose.model("roadmap", roadmapSchema);
-const questionModel = mongoose.model("question", questionSchema);
 
-export { userModel, roadmapModel, questionModel };
+export { userModel, roadmapModel };

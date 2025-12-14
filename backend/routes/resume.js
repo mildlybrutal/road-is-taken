@@ -1,11 +1,28 @@
 import { Router } from "express";
 import multer from "multer";
-import pdf from "pdf-parse";
-const resumeRouter = Router();
+import { PdfData, VerbosityLevel } from "pdfdataextract";
+import fs from "fs";
+import path from "path";
+import { roadmapModel } from "../db/db.js"
+import { GoogleGenAI } from "@google/genai";
 
+const resumeRouter = Router();
 const ai = new GoogleGenAI({});
 
-const storage = multer.memoryStorage();
+// Configure Multer for Disk Storage
+const storage = multer.diskStorage({
+	destination: (req, file, cb) => {
+		// Ensure directory exists
+		const uploadDir = "./backend/uploads";
+		if (!fs.existsSync(uploadDir)) {
+			fs.mkdirSync(uploadDir, { recursive: true });
+		}
+		cb(null, uploadDir);
+	},
+	filename: (req, file, cb) => {
+		cb(null, `${Date.now()}-${file.originalname}`);
+	},
+});
 
 const upload = multer({
 	storage: storage,
@@ -20,9 +37,9 @@ const upload = multer({
 });
 
 resumeRouter.post("/analyse", upload.single("resume"), async (req, res) => {
+	let filePath = null;
 	try {
 		const { domain } = req.body;
-
 		const userId = req.userId;
 
 		if (!req.file) {
@@ -32,7 +49,11 @@ resumeRouter.post("/analyse", upload.single("resume"), async (req, res) => {
 			});
 		}
 
+		filePath = req.file.path;
+
 		if (!domain) {
+			// Clean up if domain is missing
+			if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 			return res.json({
 				status: 400,
 				message: "Target domain is required",
@@ -40,9 +61,20 @@ resumeRouter.post("/analyse", upload.single("resume"), async (req, res) => {
 		}
 
 		let resumeText = "";
+
 		try {
-			const pdfData = await pdf(req.file.buffer);
-			resumeText = pdfData.text;
+			console.time("PDF_PARSE");
+			const fileBuffer = fs.readFileSync(filePath);
+			const data = await PdfData.extract(fileBuffer, {
+				verbosity: VerbosityLevel.ERRORS,
+				get: {
+					pages: true,
+					text: true,
+				},
+			});
+
+			resumeText = data.text.join(" ");
+
 			resumeText = resumeText
 				.replace(/\n+/g, " ")
 				.replace(/\s+/g, " ")
@@ -51,11 +83,19 @@ resumeRouter.post("/analyse", upload.single("resume"), async (req, res) => {
 			if (resumeText.length > 10000) {
 				resumeText = resumeText.substring(0, 10000) + "...";
 			}
+			console.timeEnd("PDF_PARSE");
 		} catch (parseError) {
+			console.error("PDF Parsing Error:", parseError);
+			console.timeEnd("PDF_PARSE");
 			return res.json({
 				status: 500,
 				message: "Failed to read pdf",
 			});
+		} finally {
+			// Clean up the uploaded file
+			if (filePath && fs.existsSync(filePath)) {
+				fs.unlinkSync(filePath);
+			}
 		}
 
 		const prompt = `
@@ -110,10 +150,12 @@ resumeRouter.post("/analyse", upload.single("resume"), async (req, res) => {
             }
         `;
 
+		console.time("AI_GENERATE");
 		const apiCall = await ai.models.generateContent({
 			model: "gemini-2.5-flash",
 			contents: prompt,
 		});
+		console.timeEnd("AI_GENERATE");
 
 		const text = apiCall.text;
 
@@ -150,6 +192,15 @@ resumeRouter.post("/analyse", upload.single("resume"), async (req, res) => {
 			newRoadmap,
 		});
 	} catch (error) {
+		// Ensure file is deleted if checking req.file failed or something else happened
+		if (filePath && fs.existsSync(filePath)) {
+			try {
+				fs.unlinkSync(filePath);
+			} catch (cleanupErr) {
+				console.error("Failed to cleanup file:", cleanupErr);
+			}
+		}
+
 		return res.status(500).json({
 			status: 500,
 			message: "Internal server error processing resume.",

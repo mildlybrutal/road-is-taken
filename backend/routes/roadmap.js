@@ -25,18 +25,19 @@ roadmapRouter.post("/generate", async (req, res) => {
             
             USER CONTEXT:
             - Current Skill Level: ${user.level}/3
-            - Quiz Score: ${user.quizScore}/100
             - Verified Skills (Already knows these): [${user.githubSkills.join(
 			", "
 		)}]
             
             REQUIREMENTS:
             1. Generate a Directed Acyclic Graph (DAG) of learning topics.
-            2. If a topic matches the "Verified Skills", set its status to "completed".
-            3. If a topic is a prerequisite for a completed topic, mark it "completed" too.
-            4. If a topic is the immediate next step, set status to "pending". All others "locked".
-            5. Return ONLY valid JSON. No markdown. No text.
-			3. **ESTIMATE TIME**: specific to their level (e.g., "2 hours" for a pro, "1 week" for a beginner).
+            2. **SMART INPUT LOGIC**: 
+               - If a topic matches the "Verified Skills", or is a prerequisite of a verified skill, MARK IT AS "completed".
+               - **DO NOT** create nodes for basic prerequisites the user obviously knows (implied by their verified skills), UNLESS it is necessary to show the path.
+               - IF the user knows X, and X leads to Y, start the "pending" nodes at Y.
+            3. If a topic is the immediate next step, set status to "pending". All others "locked".
+            4. Return ONLY valid JSON. No markdown. No text.
+			5. **ESTIMATE TIME**: specific to their level (e.g., "2 hours" for a pro, "1 week" for a beginner).
 			
             
             JSON STRUCTURE:
@@ -48,7 +49,7 @@ roadmapRouter.post("/generate", async (req, res) => {
                     "data": { 
                         "label": "Topic Name", 
                         "description": "Short summary", 
-						"estimatedTime": "4 Hours",
+                        "estimatedTime": "4 Hours",
                         "resources": [{ "title": "Docs", "url": "https://..." }] 
                     }, 
                     "status": "completed" | "pending" | "locked" 

@@ -1,6 +1,6 @@
 import express from "express";
 import userRouter from "./routes/user.js";
-import questionRouter from "./routes/questions.js";
+import resumeRouter from "./routes/resume.js";
 import userMiddleware from "./middleware/user.js";
 import githubRouter from "./routes/github.js";
 import roadmapRouter from "./routes/roadmap.js";
@@ -21,7 +21,7 @@ app.use(cors({
 }));
 
 app.use("/api/v1/user", userRouter);
-app.use("/api/v1/questions", userMiddleware, questionRouter);
+app.use("/api/v1/resume", userMiddleware, resumeRouter);
 app.use("/api/v1/fetchGithub", userMiddleware, githubRouter);
 app.use("/api/v1/roadmap", userMiddleware, roadmapRouter);
 

@@ -13,6 +13,8 @@ const Dashboard = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
     const [domain, setDomain] = useState("");
+    const [activeMode, setActiveMode] = useState("smart"); // "smart" | "resume"
+    const [resumeFile, setResumeFile] = useState(null);
     const [showGithubModal, setShowGithubModal] = useState(false);
     const navigate = useNavigate();
 
@@ -33,14 +35,41 @@ const Dashboard = () => {
         }
     };
 
+    const handleFileChange = (e) => {
+        if (e.target.files && e.target.files[0]) {
+            setResumeFile(e.target.files[0]);
+        }
+    };
+
     const handleGenerate = async (e) => {
         e.preventDefault();
-        if (!domain.trim()) return;
+
+        if (activeMode === "smart") {
+            if (!domain.trim()) return;
+        } else {
+            // Resume mode
+            if (!resumeFile || !domain.trim()) return;
+        }
 
         setIsGenerating(true);
         try {
-            const res = await api.post("/roadmap/generate", { domain });
+            let res;
+            if (activeMode === "smart") {
+                res = await api.post("/roadmap/generate", { domain });
+            } else {
+                const formData = new FormData();
+                formData.append("resume", resumeFile);
+                formData.append("domain", domain);
+                res = await api.post("/resume/analyse", formData, {
+                    headers: {
+                        "Content-Type": "multipart/form-data",
+                    },
+                });
+            }
+
             if (res.data.status === 200) {
+                // If it's resume mode, the backend returns 'newRoadmap' inside data?
+                // Let's assume standard response structure
                 navigate(`/roadmap/${res.data.newRoadmap._id}`);
             }
         } catch (error) {
@@ -74,26 +103,72 @@ const Dashboard = () => {
             {/* Generator Section */}
             <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-8 md:p-12">
                 <div className="relative z-10 max-w-2xl">
-                    <h2 className="text-2xl font-bold text-white mb-4">What do you want to learn next?</h2>
-                    <form onSubmit={handleGenerate} className="flex flex-col sm:flex-row gap-4">
-                        <Input
-                            value={domain}
-                            onChange={(e) => setDomain(e.target.value)}
-                            placeholder="e.g. Full Stack Development, Machine Learning, Pottery..."
-                            className="flex-1 bg-black/50 border-white/20 text-lg h-12"
-                            disabled={isGenerating}
-                        />
-                        <Button type="submit" size="lg" disabled={isGenerating || !domain.trim()} className="shrink-0 h-12 px-8">
-                            {isGenerating ? (
-                                <>
-                                    <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Generating...
-                                </>
-                            ) : (
-                                <>
-                                    <Plus className="mr-2 h-5 w-5" /> Create Roadmap
-                                </>
-                            )}
-                        </Button>
+                    <h2 className="text-2xl font-bold text-white mb-6">What do you want to learn next?</h2>
+
+                    {/* Tabs */}
+                    <div className="flex gap-4 mb-6 border-b border-white/10 pb-1">
+                        <button
+                            onClick={() => setActiveMode("smart")}
+                            className={`pb-2 text-sm font-medium transition-colors relative ${activeMode === "smart" ? "text-white" : "text-gray-400 hover:text-gray-300"}`}
+                        >
+                            Smart Input
+                            {activeMode === "smart" && <div className="absolute bottom-[-5px] left-0 right-0 h-0.5 bg-indigo-500 rounded-full"></div>}
+                        </button>
+                        <button
+                            onClick={() => setActiveMode("resume")}
+                            className={`pb-2 text-sm font-medium transition-colors relative ${activeMode === "resume" ? "text-white" : "text-gray-400 hover:text-gray-300"}`}
+                        >
+                            Resume Mode
+                            {activeMode === "resume" && <div className="absolute bottom-[-5px] left-0 right-0 h-0.5 bg-indigo-500 rounded-full"></div>}
+                        </button>
+                    </div>
+
+                    <form onSubmit={handleGenerate} className="flex flex-col gap-4">
+                        <div className="flex flex-col sm:flex-row gap-4">
+                            <Input
+                                value={domain}
+                                onChange={(e) => setDomain(e.target.value)}
+                                placeholder={activeMode === "smart" ? "e.g. Full Stack Development..." : "Target Role (e.g. React Developer)"}
+                                className="flex-1 bg-black/50 border-white/20 text-lg h-12"
+                                disabled={isGenerating}
+                            />
+                            <Button
+                                type="submit"
+                                size="lg"
+                                disabled={isGenerating || !domain.trim() || (activeMode === "resume" && !resumeFile)}
+                                className="shrink-0 h-12 px-8"
+                            >
+                                {isGenerating ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> {activeMode === "resume" ? "Analyzing..." : "Generating..."}
+                                    </>
+                                ) : (
+                                    <>
+                                        <Plus className="mr-2 h-5 w-5" /> {activeMode === "resume" ? "Analyze & Create" : "Create Roadmap"}
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+
+                        {activeMode === "resume" && (
+                            <div className="mt-2">
+                                <label className="block text-sm font-medium text-gray-400 mb-2">Upload Resume (PDF only)</label>
+                                <div className="flex items-center gap-4">
+                                    <input
+                                        type="file"
+                                        accept="application/pdf"
+                                        onChange={handleFileChange}
+                                        className="text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-500/10 file:text-indigo-400 hover:file:bg-indigo-500/20"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {activeMode === "smart" && (
+                            <p className="text-xs text-gray-500">
+                                Tip: We use your verified GitHub skills to skip what you already know.
+                            </p>
+                        )}
                     </form>
                 </div>
             </section>
