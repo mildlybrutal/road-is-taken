@@ -36,6 +36,8 @@ roadmapRouter.post("/generate", async (req, res) => {
             3. If a topic is a prerequisite for a completed topic, mark it "completed" too.
             4. If a topic is the immediate next step, set status to "pending". All others "locked".
             5. Return ONLY valid JSON. No markdown. No text.
+			3. **ESTIMATE TIME**: specific to their level (e.g., "2 hours" for a pro, "1 week" for a beginner).
+			
             
             JSON STRUCTURE:
             {
@@ -46,6 +48,7 @@ roadmapRouter.post("/generate", async (req, res) => {
                     "data": { 
                         "label": "Topic Name", 
                         "description": "Short summary", 
+						"estimatedTime": "4 Hours",
                         "resources": [{ "title": "Docs", "url": "https://..." }] 
                     }, 
                     "status": "completed" | "pending" | "locked" 

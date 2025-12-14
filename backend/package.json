@@ -20,6 +20,8 @@
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^7.0.0",
     "mongoose": "^8.19.3",
+    "multer": "^2.0.2",
+    "pdf-parse": "^2.4.5",
     "zod": "^4.1.13"
   }
 }

@@ -22,6 +22,7 @@ const nodeSchema = new Schema({
 	type: String, // "topic" or "project"
 	data: {
 		label: String, // "Learn useEffect"
+		estimatedTime: String,
 		resources: [{ title: String, url: String }],
 		description: String,
 	},
@@ -46,6 +47,11 @@ const roadmapSchema = new Schema(
 			ref: "User",
 		},
 		domain: String,
+		type: {
+			type: String,
+			enum: ["normal", "resume", "github", "oss"],
+			default: "normal",
+		},
 		nodes: [nodeSchema],
 		edges: [edgeSchema],
 		createdAt: { type: Date, default: Date.now },
