@@ -8,22 +8,26 @@ import mongoose from "mongoose";
 import cors from "cors";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
+import ossRouter from "./routes/oss.js";
 dotenv.config();
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
-app.use(cors({
-	origin: (origin, callback) => {
-		console.log("CORS Origin Request:", origin);
-		callback(null, true);
-	},
-	credentials: true
-}));
+app.use(
+	cors({
+		origin: (origin, callback) => {
+			console.log("CORS Origin Request:", origin);
+			callback(null, true);
+		},
+		credentials: true,
+	})
+);
 
 app.use("/api/v1/user", userRouter);
 app.use("/api/v1/resume", userMiddleware, resumeRouter);
 app.use("/api/v1/fetchGithub", userMiddleware, githubRouter);
 app.use("/api/v1/roadmap", userMiddleware, roadmapRouter);
+app.use("/api/v1/oss", userMiddleware, ossRouter);
 
 async function main() {
 	await mongoose.connect(process.env.MONGODB_URI);

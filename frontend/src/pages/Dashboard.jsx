@@ -13,7 +13,7 @@ const Dashboard = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
     const [domain, setDomain] = useState("");
-    const [activeMode, setActiveMode] = useState("smart"); // "smart" | "resume"
+    const [activeMode, setActiveMode] = useState("smart"); // "smart" | "resume" | "oss"
     const [resumeFile, setResumeFile] = useState(null);
     const [showGithubModal, setShowGithubModal] = useState(false);
     const navigate = useNavigate();
@@ -46,6 +46,8 @@ const Dashboard = () => {
 
         if (activeMode === "smart") {
             if (!domain.trim()) return;
+        } else if (activeMode === "oss") {
+            if (!domain.trim()) return;
         } else {
             // Resume mode
             if (!resumeFile || !domain.trim()) return;
@@ -56,6 +58,8 @@ const Dashboard = () => {
             let res;
             if (activeMode === "smart") {
                 res = await api.post("/roadmap/generate", { domain });
+            } else if (activeMode === "oss") {
+                res = await api.post("/oss/decode", { repoUrl: domain });
             } else {
                 const formData = new FormData();
                 formData.append("resume", resumeFile);
@@ -121,6 +125,13 @@ const Dashboard = () => {
                             Resume Mode
                             {activeMode === "resume" && <div className="absolute bottom-[-5px] left-0 right-0 h-0.5 bg-indigo-500 rounded-full"></div>}
                         </button>
+                        <button
+                            onClick={() => setActiveMode("oss")}
+                            className={`pb-2 text-sm font-medium transition-colors relative ${activeMode === "oss" ? "text-white" : "text-gray-400 hover:text-gray-300"}`}
+                        >
+                            Repo Decoder
+                            {activeMode === "oss" && <div className="absolute bottom-[-5px] left-0 right-0 h-0.5 bg-indigo-500 rounded-full"></div>}
+                        </button>
                     </div>
 
                     <form onSubmit={handleGenerate} className="flex flex-col gap-4">
@@ -128,7 +139,7 @@ const Dashboard = () => {
                             <Input
                                 value={domain}
                                 onChange={(e) => setDomain(e.target.value)}
-                                placeholder={activeMode === "smart" ? "e.g. Full Stack Development..." : "Target Role (e.g. React Developer)"}
+                                placeholder={activeMode === "smart" ? "e.g. Full Stack Development..." : activeMode === "oss" ? "GitHub Repo URL (e.g. facebook/react)" : "Target Role (e.g. React Developer)"}
                                 className="flex-1 bg-black/50 border-white/20 text-lg h-12"
                                 disabled={isGenerating}
                             />
@@ -140,11 +151,11 @@ const Dashboard = () => {
                             >
                                 {isGenerating ? (
                                     <>
-                                        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> {activeMode === "resume" ? "Analyzing..." : "Generating..."}
+                                        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> {activeMode === "resume" ? "Analyzing..." : activeMode === "oss" ? "Decoding..." : "Generating..."}
                                     </>
                                 ) : (
                                     <>
-                                        <Plus className="mr-2 h-5 w-5" /> {activeMode === "resume" ? "Analyze & Create" : "Create Roadmap"}
+                                        <Plus className="mr-2 h-5 w-5" /> {activeMode === "resume" ? "Analyze & Create" : activeMode === "oss" ? "Visualize Repo" : "Create Roadmap"}
                                     </>
                                 )}
                             </Button>

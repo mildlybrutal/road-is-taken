@@ -16,7 +16,7 @@ githubRouter.post("/username", async (req, res) => {
 	}
 	try {
 		const response = await axios.get(
-			`https://api.github.com/users/${githubHandle}/repos?sort=updated&per_page=10`
+			`https://api.github.com/users/${githubHandle}/repos?sort=updated&per_page=10`,
 		);
 
 		const repos = response.data;
