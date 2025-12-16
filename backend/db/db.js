@@ -25,6 +25,7 @@ const nodeSchema = new Schema({
 		estimatedTime: String,
 		resources: [{ title: String, url: String }],
 		description: String,
+		projectIdea: String,
 	},
 	status: {
 		type: String,

@@ -126,8 +126,10 @@ resumeRouter.post("/analyse", upload.single("resume"), async (req, res) => {
                         "type": "topic", 
                         "data": { 
                             "label": "JavaScript Basics", 
+							"estimatedTime": "3 Days",
+							"resources": [{ "title": "Docs", "url": "https://..." }],
                             "description": "Core language fundamentals.",
-							"estimatedTime": "3 Days",  <-- ADD THIS
+							"projectIdea": "Build a Todo App",
                             "status": "completed" 
                         },
                         "position": { "x": 0, "y": 0 }
@@ -137,8 +139,10 @@ resumeRouter.post("/analyse", upload.single("resume"), async (req, res) => {
                         "type": "topic", 
                         "data": { 
                             "label": "Advanced React Patterns", 
+							"estimatedTime": "3 Days",
+							"resources": [{ "title": "Docs", "url": "https://..." }],
                             "description": "HOCs, Render Props, and Custom Hooks.",
-							"estimatedTime": "3 Days",  <-- ADD THIS
+							"projectIdea": "Build a Todo App",
                             "status": "pending" 
                         },
                         "position": { "x": 0, "y": 100 }
@@ -169,12 +173,10 @@ resumeRouter.post("/analyse", upload.single("resume"), async (req, res) => {
 			position: node.position || { x: 0, y: index * 100 },
 			data: {
 				...node.data,
-				status: ["completed", "pending", "locked"].includes(
-					node.data.status
-				)
-					? node.data.status
-					: "locked",
 			},
+			status: ["completed", "pending", "locked"].includes(node.status)
+				? node.status
+				: "locked",
 		}));
 
 		const newRoadmap = new roadmapModel({

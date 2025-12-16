@@ -48,6 +48,17 @@ const DetailModal = ({ isOpen, onClose, node, onStatusChange }) => {
                             </p>
                         </div>
 
+                        {/* Estimated Time Section */}
+                        {node.data?.estimatedTime && (
+                            <div>
+                                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">Estimated Time</h3>
+                                <div className="flex items-center text-gray-300 gap-2">
+                                    <Clock className="w-4 h-4 text-emerald-500" />
+                                    <span className="text-sm font-medium">{node.data.estimatedTime}</span>
+                                </div>
+                            </div>
+                        )}
+
                         <div>
                             <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">Recommended Resources</h3>
                             <div className="space-y-2">

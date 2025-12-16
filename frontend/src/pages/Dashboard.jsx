@@ -205,9 +205,14 @@ const Dashboard = () => {
                                         <div className="p-3 rounded-lg bg-white/10 text-gray-300 group-hover:bg-white/20 group-hover:text-white transition-colors">
                                             <Map className="h-6 w-6" />
                                         </div>
-                                        <span className="text-xs font-medium text-gray-500 bg-white/5 px-2 py-1 rounded-full border border-white/5">
-                                            {new Date(map.createdAt).toLocaleDateString()}
-                                        </span>
+                                        <div className="flex gap-2">
+                                            <span className="text-xs font-medium text-gray-500 bg-white/5 px-2 py-1 rounded-full border border-white/5">
+                                                {map.type === "normal" ? "Smart" : map.type === "resume" ? "Resume" : map.type === "oss" ? "OSS" : "Github"}
+                                            </span>
+                                            <span className="text-xs font-medium text-gray-500 bg-white/5 px-2 py-1 rounded-full border border-white/5">
+                                                {new Date(map.createdAt).toLocaleDateString()}
+                                            </span>
+                                        </div>
                                     </div>
                                     <h4 className="text-lg font-bold text-white mb-2 group-hover:text-gray-200 transition-colors">
                                         {map.domain}

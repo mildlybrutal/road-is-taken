@@ -97,10 +97,12 @@ ossRouter.post("/decode", async (req, res) => {
                         "type": "topic", 
                         "data": { 
                             "label": "${language} Core", 
-                            "description": "The fundamental language syntax.",
                             "estimatedTime": "0 hours",
-                            "status": "completed" 
+							"resources": [{ "title": "Docs", "url": "https://..." }],
+                            "description": "The fundamental language syntax.",
+							"projectIdea": "Build a Todo App",
                         },
+                        "status": "completed",
                         "position": { "x": 0, "y": 0 }
                     },
                     { 
@@ -108,10 +110,12 @@ ossRouter.post("/decode", async (req, res) => {
                         "type": "topic", 
                         "data": { 
                             "label": "Express.js", 
-                            "description": "Main web server framework handling routes and middleware.",
                             "estimatedTime": "3 Days",
-                            "status": "pending" 
+							"resources": [{ "title": "Docs", "url": "https://..." }],
+                            "description": "Main web server framework handling routes and middleware.",
+							"projectIdea": "Build a Todo App",
                         },
+                        "status": "pending",
                         "position": { "x": 0, "y": 100 }
                     }
                 ],
@@ -138,6 +142,8 @@ ossRouter.post("/decode", async (req, res) => {
 		const newRoadmap = new roadmapModel({
 			user: userId,
 			repoUrl: repoUrl,
+			domain: cleanUrl,
+			type: "oss",
 			language: language,
 			nodes: nodesWithPos,
 			edges: graphData.edges,

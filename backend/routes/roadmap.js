@@ -15,11 +15,12 @@ roadmapRouter.post("/generate", async (req, res) => {
 		const user = await userModel.findById(userId);
 
 		if (!user) {
-			res.json({
+			return res.json({
 				status: 404,
 				message: "user not found",
 			});
 		}
+
 		const prompt = `
             Act as a Senior Engineering Mentor. Create a learning roadmap for: "${domain}".
             
@@ -48,9 +49,10 @@ roadmapRouter.post("/generate", async (req, res) => {
                     "type": "topic", 
                     "data": { 
                         "label": "Topic Name", 
-                        "description": "Short summary", 
                         "estimatedTime": "4 Hours",
-                        "resources": [{ "title": "Docs", "url": "https://..." }] 
+                        "resources": [{ "title": "Docs", "url": "https://..." }],
+                        "description": "Short summary", 
+                        "projectIdea": "Build a Todo App" 
                     }, 
                     "status": "completed" | "pending" | "locked" 
                 }
@@ -72,6 +74,7 @@ roadmapRouter.post("/generate", async (req, res) => {
 
 		const nodesWithPos = graphData.nodes.map((node, index) => ({
 			...node,
+			status: node.status ? node.status.toLowerCase() : "locked",
 			position: { x: 0, y: 0 },
 		}));
 
@@ -93,6 +96,7 @@ roadmapRouter.post("/generate", async (req, res) => {
 		res.json({
 			status: 500,
 			message: "AI call failed, unable to generate roadmap",
+			error: error.message,
 		});
 	}
 });
@@ -160,7 +164,6 @@ roadmapRouter.put("/update", async (req, res) => {
 				);
 
 				if (targetNodeIndex !== -1) {
-					//changes target from locked to pending
 					if (roadmap.nodes[targetNodeIndex].status === "locked") {
 						roadmap.nodes[targetNodeIndex].status = "pending";
 					}
