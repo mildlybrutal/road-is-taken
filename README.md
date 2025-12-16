@@ -1,84 +1,69 @@
-Here is the updated `README.md` file without emojis.
-
------
-
 # Road Is Taken
 
-**Road Is Taken** is an intelligent, personalized learning roadmap generator. Unlike static tutorials, this application uses GenAI to create dynamic Directed Acyclic Graphs (DAGs) for learning new technologies. It tailors the roadmap based on your current skill level, quiz performance, and verified skills fetched directly from your GitHub repository history.
+**Road Is Taken** is an intelligent, personalized learning roadmap generator designed to help developers master new technologies. Unlike static tutorials, this application uses Google's Gemini GenAI to create dynamic Directed Acyclic Graphs (DAGs) tailored to your specific needs. It features three distinct modes for generating roadmaps: tailored to your current skills, based on an open-source repository, or derived from your resume.
 
 ## Key Features
 
-### 1\. AI-Powered Roadmap Generation
+### 1. Multiple Roadmap Modes
 
-  - Uses **Google Gemini (GenAI)** to generate structured learning paths (nodes and edges).
-  - **Context-Aware:** The AI acts as a "Senior Engineering Mentor," taking into account:
-      - Your current skill level (1-3).
-      - Your performance in adaptive quizzes.
-      - Skills you have already verified via GitHub.
-  - **DAG Structure:** Generates a graph where topics depend on prerequisites.
+*   **Normal Mode (Topic-Based):**
+    *   Generates a structured learning path for any given topic (e.g., "Full Stack Development").
+    *   Smart Input automatically filters out concepts you likely already know based on your user profile.
+*   **OSS Mode (Repo Decoder):**
+    *   Analyzes a GitHub repository URL to reverse-engineer its tech stack and architecture.
+    *   Creates a roadmap to help you understand and contribute to that specific open-source project.
+    *   Detects languages and frameworks automatically (e.g., finding `package.json` for JS/TS, `go.mod` for Go).
+*   **Resume Mode (Career Path):**
+    *   Upload your resume (PDF) to get a personalized roadmap.
+    *   Analyzes your existing skills and compares them against a target domain (e.g., "Senior Backend Engineer").
+    *   Identifies knowledge gaps and estimates time required to bridge them.
 
-### 2\. GitHub Skill Verification
+### 2. AI-Powered & Context-Aware
 
-  - Syncs with your GitHub profile to analyze your repositories.
-  - Automatically detects languages and technologies you have used.
-  - **SmartSkipping:** If the AI detects you already possess a skill (via GitHub), it automatically marks that node (and its prerequisites) as "Completed" in your roadmap.
+*   **Google Gemini Integration:** Acts as a "Senior Engineering Mentor" to break down complex topics into manageable nodes.
+*   **Smart Skipping:** Syncs with your GitHub profile to verify your existing skills and automatically marks relevant roadmap nodes as "Completed," allowing you to focus on what's new.
 
-### 3\. Adaptive Quiz System
+### 3. Interactive Roadmap UI
 
-  - **Dynamic Difficulty:** The system adjusts question difficulty based on your performance.
-      - Answer correctly? The next question gets harder (up to Level 3).
-      - Answer incorrectly? The next question gets easier.
-  - **Smart Sampling:** Fetches questions specifically for the domain you are learning, ensuring you haven't answered them before.
-
-### 4\. Gamified Progression
-
-  - **Lock/Unlock System:**
-      - **Completed:** Topics you have finished.
-      - **Pending:** Immediate next steps (unlocked).
-      - **Locked:** Future topics that require prerequisites to be finished first.
-  - Completing a node automatically checks the graph to unlock dependent nodes.
-
------
+*   **Visual DAG Structure:** Powered by React Flow, visualizing dependencies between topics.
+*   **Gamified Progression:**
+    *   **Completed:** Topics you have mastered.
+    *   **Pending:** The next logical steps (unlocked).
+    *   **Locked:** Advanced topics that require prerequisites to be finished first.
+*   **Optimistic Updates:** Immediate UI feedback when marking nodes as completed.
+*   **Modern Design:** Features a dark grid aesthetic, "Instrument Serif" typography, and smooth animations.
 
 ## Tech Stack
 
-### Backend
-
-  - **Runtime:** Node.js
-  - **Framework:** Express.js
-  - **Database:** MongoDB (via Mongoose)
-  - **AI Integration:** Google GenAI SDK (`gemini-2.5-flash`)
-  - **Validation:** Zod
-  - **Authentication:** JWT (JSON Web Tokens) & Bcrypt
-  - **External APIs:** GitHub API
-
 ### Frontend
+*   **Framework:** React.js (Vite)
+*   **Styling:** TailwindCSS
+*   **Visualization:** React Flow
+*   **Icons & UI:** Lucide React, Framer Motion
 
-  - **Framework:** React.js
-  - **Build Tool:** Vite
-  - **Styling:** TailwindCSS
-
------
+### Backend
+*   **Runtime:** Node.js, Express.js
+*   **Database:** MongoDB (Mongoose)
+*   **AI:** Google Gemini SDK (`gemini-2.5-flash`)
+*   **File Processing:** `pdf2json` (for Resume parsing)
+*   **Authentication:** JWT & Bcrypt
+*   **Validation:** Zod
 
 ## Installation & Setup
 
 ### Prerequisites
+*   Node.js (v18+)
+*   MongoDB (Local or Atlas)
+*   Google Gemini API Key
 
-  - Node.js (v18+)
-  - MongoDB (Local or Atlas)
-  - Google Gemini API Key
-
-### 1\. Clone the Repository
-
+### 1. Clone the Repository
 ```bash
 git clone <repository-url>
 cd road-is-taken
 ```
 
-### 2\. Backend Setup
-
+### 2. Backend Setup
 Navigate to the backend folder and install dependencies:
-
 ```bash
 cd backend
 npm install
@@ -86,89 +71,58 @@ npm install
 
 **Environment Variables:**
 Create a `.env` file in the `backend` directory:
-
 ```env
-MONGO_URI=your_mongodb_connection_string
+MONGODB_URI=your_mongodb_connection_string
 JWT_USER_PASSWORD=your_jwt_secret
 GEMINI_API_KEY=your_google_genai_key
+GITHUB_TOKEN=your_github_token
 ```
+*Note: GITHUB_TOKEN is required for OSS mode repository analysis.*
 
 **Seed the Database:**
-Populate the database with initial assessment questions (React, JS, etc.):
-
+Populate initial data:
 ```bash
 node seed.js
 ```
 
 **Start the Server:**
-
 ```bash
 node index.js
 ```
-
 *Server runs on port 3000 by default.*
 
-### 3\. Frontend Setup
-
+### 3. Frontend Setup
 Navigate to the frontend folder:
-
 ```bash
 cd ../frontend
 npm install
 npm run dev
 ```
 
------
-
 ## API Documentation
 
 ### User & Auth
-
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
 | `POST` | `/api/v1/user/sign-up` | Register a new user. |
 | `POST` | `/api/v1/user/sign-in` | Login and receive a JWT. |
 | `GET` | `/api/v1/user/me` | Get current user details. |
-| `POST` | `/api/v1/user/update-score` | Update user level/quiz score manually. |
+
+### Roadmap Generation
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/v1/roadmap/generate` | Generates a roadmap for a given topic (Normal Mode). |
+| `POST` | `/api/v1/oss/decode` | Generates a roadmap from a GitHub Repo URL (OSS Mode). |
+| `POST` | `/api/v1/resume/analyse` | Generates a roadmap by analyzing an uploaded Resume PDF (Resume Mode). |
+
+### Roadmap Interaction
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/v1/roadmap/view` | Fetches the specific roadmap details. |
+| `GET` | `/api/v1/roadmap/all` | Fetch all roadmaps for the user. |
+| `PUT` | `/api/v1/roadmap/update` | Updates a node status (e.g., mark as completed). |
 
 ### GitHub Integration
-
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `GET` | `/api/v1/fetchGithub/username` | Analyzes GitHub repos and updates verified skills. |
-
-### Roadmap Management
-
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `POST` | `/api/v1/roadmap/generate` | Generates a new AI roadmap for a specific domain. |
-| `GET` | `/api/v1/roadmap/view` | Fetches the user's current roadmap. |
-| `PUT` | `/api/v1/roadmap/update` | Updates a node status (e.g., mark as completed) and unlocks new nodes. |
-| `GET` | `/api/v1/roadmap/all` | Fetch all roadmaps for the user. |
-
-### Assessments
-
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `POST` | `/api/v1/questions/next` | Fetches the next question based on difficulty logic. |
-
------
-
-## Project Structure
-
-```text
-road-is-taken/
-├── backend/
-│   ├── data/             # Static assessment data (seeds)
-│   ├── db/               # Mongoose schemas (User, Roadmap, Question)
-│   ├── middleware/       # Auth middleware
-│   ├── routes/           # API Routes (Github, Questions, Roadmap, User)
-│   ├──Qm config.js         # Configuration exports
-│   ├── index.js          # Entry point
-│   └── seed.js           # Database seeding script
-└── frontend/
-    ├── src/              # React components and logic
-    ├── public/           # Static assets
-    └── vite.config.js    # Vite configuration
-```
-
+| `GET` | `/api/v1/fetchGithub/username` | Analyzes GitHub repos to update verified skills and smart-skip roadmap nodes. |
