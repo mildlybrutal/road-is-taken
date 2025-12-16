@@ -129,9 +129,9 @@ resumeRouter.post("/analyse", upload.single("resume"), async (req, res) => {
 							"estimatedTime": "3 Days",
 							"resources": [{ "title": "Docs", "url": "https://..." }],
                             "description": "Core language fundamentals.",
-							"projectIdea": "Build a Todo App",
-                            "status": "completed" 
+							"projectIdea": "Build a Todo App"
                         },
+                        "status": "completed",
                         "position": { "x": 0, "y": 0 }
                     },
                     { 
@@ -142,9 +142,9 @@ resumeRouter.post("/analyse", upload.single("resume"), async (req, res) => {
 							"estimatedTime": "3 Days",
 							"resources": [{ "title": "Docs", "url": "https://..." }],
                             "description": "HOCs, Render Props, and Custom Hooks.",
-							"projectIdea": "Build a Todo App",
-                            "status": "pending" 
+							"projectIdea": "Build a Todo App" 
                         },
+                        "status": "pending",
                         "position": { "x": 0, "y": 100 }
                     }
                 ],
@@ -166,22 +166,28 @@ resumeRouter.post("/analyse", upload.single("resume"), async (req, res) => {
 		const jsonString = text.replace(/```json|```/g, "").trim();
 		const graphData = JSON.parse(jsonString);
 
-		const nodesWithPos = graphData.nodes.map((node, index) => ({
-			...node,
-			id: node.id || `node-${index}`,
-			type: "topic",
-			position: node.position || { x: 0, y: index * 100 },
-			data: {
-				...node.data,
-			},
-			status: ["completed", "pending", "locked"].includes(node.status)
-				? node.status
-				: "locked",
-		}));
+		const nodesWithPos = graphData.nodes.map((node, index) => {
+			const rawStatus = node.status || node.data?.status || "locked";
+			const status = rawStatus.toLowerCase();
+
+			return {
+				...node,
+				id: node.id || `node-${index}`,
+				type: "topic",
+				position: node.position || { x: 0, y: index * 100 },
+				data: {
+					...node.data,
+				},
+				status: ["completed", "pending", "locked"].includes(status)
+					? status
+					: "locked",
+			};
+		});
 
 		const newRoadmap = new roadmapModel({
 			user: userId,
 			domain: `Resume Analysis: ${domain}`,
+			type: "resume",
 			nodes: nodesWithPos,
 			edges: graphData.edges,
 		});
