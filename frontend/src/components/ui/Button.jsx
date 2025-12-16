@@ -1,8 +1,9 @@
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { motion } from 'framer-motion';
 
 export function Button({ className, variant = "primary", size = "md", children, ...props }) {
-    const baseStyles = "inline-flex items-center justify-center rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none";
+    const baseStyles = "inline-flex items-center justify-center rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none cursor-pointer";
 
     const variants = {
         primary: "bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500",
@@ -19,11 +20,13 @@ export function Button({ className, variant = "primary", size = "md", children, 
     };
 
     return (
-        <button
+        <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             className={twMerge(clsx(baseStyles, variants[variant], sizes[size], className))}
             {...props}
         >
             {children}
-        </button>
+        </motion.button>
     );
 }

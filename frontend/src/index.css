@@ -23,18 +23,20 @@ body {
 
 /* Custom Scrollbar for a premium feel */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f0f0f;
+  background: #000000;
+  border-left: 1px solid #1a1a1a;
 }
 
 ::-webkit-scrollbar-thumb {
   background: #333;
-  border-radius: 4px;
+  border-radius: 5px;
+  border: 2px solid #000000;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: #4f46e5; /* Indigo-600 for hover state */
 }
