@@ -1,11 +1,33 @@
 import { Router } from "express";
 import { roadmapModel, userModel } from "../db/db.js";
 import { GoogleGenAI } from "@google/genai";
+import Groq from "groq-sdk"
 import axios from "axios";
 
 const roadmapRouter = Router();
 
-const ai = new GoogleGenAI({});
+const groq = new Groq({
+	apiKey: process.env.GROQ_API_KEY,
+})
+
+//const ai = new GoogleGenAI({});
+
+// Retry helper with exponential backoff for 503 errors
+const retryWithBackoff = async (fn, retries = 3, delay = 1000) => {
+	for (let i = 0; i < retries; i++) {
+		try {
+			return await fn();
+		} catch (error) {
+			if (error.status === 503 && i < retries - 1) {
+				console.log(`Retry ${i + 1}/${retries} after ${delay}ms...`);
+				await new Promise((r) => setTimeout(r, delay));
+				delay *= 2; // Exponential backoff
+			} else {
+				throw error;
+			}
+		}
+	}
+};
 
 roadmapRouter.post("/generate", async (req, res) => {
 	try {
@@ -21,68 +43,112 @@ roadmapRouter.post("/generate", async (req, res) => {
 			});
 		}
 
-		const prompt = `
-            Act as a Senior Engineering Mentor. Create a learning roadmap for: "${domain}".
+		// ============ PHASE 1: Generate Structure ============
+		console.time("PHASE_1_STRUCTURE");
+		const phase1Prompt = `
+            Act as a Senior Engineering Mentor. Create a learning roadmap STRUCTURE for: "${domain}".
             
             USER CONTEXT:
-            - Current Skill Level: ${user.level}/3
-            - Verified Skills (Already knows these): [${user.githubSkills.join(
-			", "
-		)}]
+            - Verified Skills (Already knows these): [${user.githubSkills.join(", ")}]
             
             REQUIREMENTS:
-            1. Generate a Directed Acyclic Graph (DAG) of learning topics.
+            1. Generate a Directed Acyclic Graph (DAG) of learning topics (10-15 nodes max).
             2. **SMART INPUT LOGIC**: 
-               - If a topic matches the "Verified Skills", or is a prerequisite of a verified skill, MARK IT AS "completed".
-               - **DO NOT** create nodes for basic prerequisites the user obviously knows (implied by their verified skills), UNLESS it is necessary to show the path.
-               - IF the user knows X, and X leads to Y, start the "pending" nodes at Y.
-            3. If a topic is the immediate next step, set status to "pending". All others "locked".
-            4. Return ONLY valid JSON. No markdown. No text.
-			5. **ESTIMATE TIME**: specific to their level (e.g., "2 hours" for a pro, "1 week" for a beginner).
-			
+               - If a topic matches "Verified Skills" or is a prerequisite, mark as "completed".
+               - If a topic is the immediate next step, set status to "pending". All others "locked".
+            3. Return ONLY valid JSON. No markdown. No text.
+            4. Keep this LIGHTWEIGHT - only labels and structure, details come later.
             
             JSON STRUCTURE:
             {
                 "nodes": [
-                { 
-                    "id": "1", 
-                    "type": "topic", 
-                    "data": { 
-                        "label": "Topic Name", 
-                        "estimatedTime": "4 Hours",
-                        "resources": [{ "title": "Docs", "url": "https://..." }],
-                        "description": "Short summary", 
-                        "projectIdea": "Build a Todo App" 
-                    }, 
-                    "status": "completed" | "pending" | "locked" 
-                }
+                    { "id": "1", "label": "Topic Name", "status": "completed" | "pending" | "locked" }
                 ],
                 "edges": [
                     { "id": "e1-2", "source": "1", "target": "2" }
                 ]
             }
+        `;
+
+		const phase1Call = await retryWithBackoff(() =>
+			groq.chat.completions.create({
+				messages: [{ role: "user", content: phase1Prompt }],
+				model: "openai/gpt-oss-120b",
+			})
+		);
+
+		const phase1Text = phase1Call.choices[0]?.message?.content || "";
+		const phase1Json = phase1Text.replace(/```json|```/g, "").trim();
+		const structure = JSON.parse(phase1Json);
+		console.timeEnd("PHASE_1_STRUCTURE");
+
+		// ============ PHASE 2: Enrich Nodes in Batches ============
+		console.time("PHASE_2_ENRICHMENT");
+		const BATCH_SIZE = 5;
+		const enrichedDetails = {};
+
+		for (let i = 0; i < structure.nodes.length; i += BATCH_SIZE) {
+			const batch = structure.nodes.slice(i, i + BATCH_SIZE);
+			const batchLabels = batch.map((n) => `- ID: ${n.id}, Topic: ${n.label}`).join("\n");
+
+			const phase2Prompt = `
+                You are enriching roadmap nodes for the domain: "${domain}".
+                
+                For each topic below, provide learning details.
+                
+                TOPICS:
+                ${batchLabels}
+                
+                Return ONLY valid JSON. No markdown.
+                Format:
+                {
+                    "<id>": {
+                        "description": "Brief 1-2 sentence explanation",
+                        "estimatedTime": "e.g. 4 Hours, 2 Days",
+                        "resources": [{ "title": "Resource Name", "url": "https://..." }],
+                        "projectIdea": "A practical project to apply this"
+                    }
+                }
             `;
 
-		const apiCall = await ai.models.generateContent({
-			model: "gemini-2.5-flash",
-			contents: prompt,
+			const phase2Call = await retryWithBackoff(() =>
+				groq.chat.completions.create({
+					messages: [{ role: "user", content: phase2Prompt }],
+					model: "openai/gpt-oss-120b",
+				})
+			);
+
+			const phase2Text = phase2Call.choices[0]?.message?.content || "";
+			const phase2Json = phase2Text.replace(/```json|```/g, "").trim();
+			const batchDetails = JSON.parse(phase2Json);
+
+			Object.assign(enrichedDetails, batchDetails);
+		}
+		console.timeEnd("PHASE_2_ENRICHMENT");
+
+		// ============ Merge Structure + Details ============
+		const nodesWithPos = structure.nodes.map((node, index) => {
+			const details = enrichedDetails[node.id] || {};
+			return {
+				id: node.id,
+				type: "topic",
+				data: {
+					label: node.label,
+					description: details.description || "",
+					estimatedTime: details.estimatedTime || "TBD",
+					resources: details.resources || [],
+					projectIdea: details.projectIdea || "",
+				},
+				status: node.status ? node.status.toLowerCase() : "locked",
+				position: { x: 0, y: 0 },
+			};
 		});
-
-		const text = apiCall.text;
-		const jsonString = text.replace(/```json|```/g, "").trim();
-		const graphData = JSON.parse(jsonString);
-
-		const nodesWithPos = graphData.nodes.map((node, index) => ({
-			...node,
-			status: node.status ? node.status.toLowerCase() : "locked",
-			position: { x: 0, y: 0 },
-		}));
 
 		const newRoadmap = new roadmapModel({
 			user: userId,
 			domain: domain,
 			nodes: nodesWithPos,
-			edges: graphData.edges,
+			edges: structure.edges,
 		});
 
 		await newRoadmap.save();
@@ -93,6 +159,7 @@ roadmapRouter.post("/generate", async (req, res) => {
 			newRoadmap,
 		});
 	} catch (error) {
+		console.error("Roadmap generation error:", error);
 		res.json({
 			status: 500,
 			message: "AI call failed, unable to generate roadmap",
@@ -252,7 +319,9 @@ roadmapRouter.post("/verify-node", async (req, res) => {
 					});
 				}
 
-				const nodeIndex = roadmap.nodes.findIndex((n) => n.id === nodeId);
+				const nodeIndex = roadmap.nodes.findIndex(
+					(n) => n.id === nodeId
+				);
 				if (nodeIndex === -1) {
 					return res.json({
 						status: 404,

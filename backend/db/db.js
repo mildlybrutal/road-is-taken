@@ -10,8 +10,6 @@ const userSchema = new Schema(
 		username: { type: String, required: true, trim: true },
 		githubUsername: { type: String, trim: true },
 		domain: String,
-		level: { type: Number, default: 1, min: 1 },
-		level: { type: Number, default: 1, min: 1 },
 		githubSkills: [String],
 	},
 	{ timestamps: true }

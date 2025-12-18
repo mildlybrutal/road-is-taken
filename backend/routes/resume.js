@@ -4,10 +4,27 @@ import { PdfData, VerbosityLevel } from "pdfdataextract";
 import fs from "fs";
 import path from "path";
 import { roadmapModel } from "../db/db.js"
-import { GoogleGenAI } from "@google/genai";
+import Groq from "groq-sdk";
 
 const resumeRouter = Router();
-const ai = new GoogleGenAI({});
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+// Retry helper with exponential backoff for 503 errors
+const retryWithBackoff = async (fn, retries = 3, delay = 1000) => {
+	for (let i = 0; i < retries; i++) {
+		try {
+			return await fn();
+		} catch (error) {
+			if (error.status === 503 && i < retries - 1) {
+				console.log(`Retry ${i + 1}/${retries} after ${delay}ms...`);
+				await new Promise((r) => setTimeout(r, delay));
+				delay *= 2;
+			} else {
+				throw error;
+			}
+		}
+	}
+};
 
 // Configure Multer for Disk Storage
 const storage = multer.diskStorage({
@@ -98,7 +115,9 @@ resumeRouter.post("/analyse", upload.single("resume"), async (req, res) => {
 			}
 		}
 
-		const prompt = `
+		// ============ PHASE 1: Analyze Resume & Generate Structure ============
+		console.time("PHASE_1_STRUCTURE");
+		const phase1Prompt = `
             Act as a Senior Engineering Mentor.
             The user wants to learn: "${domain}".
             
@@ -107,46 +126,17 @@ resumeRouter.post("/analyse", upload.single("resume"), async (req, res) => {
 
             --- INSTRUCTIONS ---
             1. **Analyze** the resume to understand their *current* verified tech stack.
-            2. **Compare** it against the industry standard requirements for "${domain}".
+            2. **Compare** it against requirements for "${domain}".
             3. **Identify Gaps**: What strictly needs to be learned?
-            4. **Construct a Roadmap (DAG)**:
-               - If the user *already knows* a prerequisite (e.g. they know 'React' but want 'Next.js'), create the 'React' node but mark its status as "completed".
-               - If a topic is new and essential, mark it as "pending".
-               - Future advanced topics should be "locked".
-			5. **CRITICAL**: For every topic, estimate the time to learn it (e.g., "4 hours", "2 days").
-           		- "Pending" items need realistic study time.
-           		- "Completed" items can have "0 hours".
+            4. **Construct a LIGHTWEIGHT Roadmap Structure (DAG)**:
+               - If user *already knows* a prerequisite, mark as "completed".
+               - New essential topics: "pending". Future advanced: "locked".
+            5. Return ONLY valid JSON. No markdown. Keep it lightweight - details come later.
             
-            --- JSON RESPONSE FORMAT ---
-            Return ONLY a valid JSON object. No markdown formatting.
+            JSON FORMAT:
             {
                 "nodes": [
-                    { 
-                        "id": "node-1", 
-                        "type": "topic", 
-                        "data": { 
-                            "label": "JavaScript Basics", 
-							"estimatedTime": "3 Days",
-							"resources": [{ "title": "Docs", "url": "https://..." }],
-                            "description": "Core language fundamentals.",
-							"projectIdea": "Build a Todo App"
-                        },
-                        "status": "completed",
-                        "position": { "x": 0, "y": 0 }
-                    },
-                    { 
-                        "id": "node-2", 
-                        "type": "topic", 
-                        "data": { 
-                            "label": "Advanced React Patterns", 
-							"estimatedTime": "3 Days",
-							"resources": [{ "title": "Docs", "url": "https://..." }],
-                            "description": "HOCs, Render Props, and Custom Hooks.",
-							"projectIdea": "Build a Todo App" 
-                        },
-                        "status": "pending",
-                        "position": { "x": 0, "y": 100 }
-                    }
+                    { "id": "node-1", "label": "Topic Name", "status": "completed" | "pending" | "locked" }
                 ],
                 "edges": [
                     { "id": "e1-2", "source": "node-1", "target": "node-2" }
@@ -154,33 +144,80 @@ resumeRouter.post("/analyse", upload.single("resume"), async (req, res) => {
             }
         `;
 
-		console.time("AI_GENERATE");
-		const apiCall = await ai.models.generateContent({
-			model: "gemini-2.5-flash",
-			contents: prompt,
-		});
-		console.timeEnd("AI_GENERATE");
+		const phase1Call = await retryWithBackoff(() =>
+			groq.chat.completions.create({
+				messages: [{ role: "user", content: phase1Prompt }],
+				model: "openai/gpt-oss-120b",
+			})
+		);
 
-		const text = apiCall.text;
+		const phase1Text = phase1Call.choices[0]?.message?.content || "";
+		const phase1Json = phase1Text.replace(/```json|```/g, "").trim();
+		const structure = JSON.parse(phase1Json);
+		console.timeEnd("PHASE_1_STRUCTURE");
 
-		const jsonString = text.replace(/```json|```/g, "").trim();
-		const graphData = JSON.parse(jsonString);
+		// ============ PHASE 2: Enrich Nodes in Batches ============
+		console.time("PHASE_2_ENRICHMENT");
+		const BATCH_SIZE = 5;
+		const enrichedDetails = {};
 
-		const nodesWithPos = graphData.nodes.map((node, index) => {
-			const rawStatus = node.status || node.data?.status || "locked";
+		for (let i = 0; i < structure.nodes.length; i += BATCH_SIZE) {
+			const batch = structure.nodes.slice(i, i + BATCH_SIZE);
+			const batchLabels = batch.map((n) => `- ID: ${n.id}, Topic: ${n.label}, Status: ${n.status}`).join("\n");
+
+			const phase2Prompt = `
+                You are enriching learning roadmap nodes for someone learning: "${domain}".
+                
+                For each topic below, provide learning details. For "completed" topics, keep it brief.
+                
+                TOPICS:
+                ${batchLabels}
+                
+                Return ONLY valid JSON. No markdown.
+                Format:
+                {
+                    "<id>": {
+                        "description": "Brief 1-2 sentence explanation",
+                        "estimatedTime": "e.g. 0 hours for completed, 4 Hours, 2 Days for new topics",
+                        "resources": [{ "title": "Resource Name", "url": "https://..." }],
+                        "projectIdea": "A practical project to apply this"
+                    }
+                }
+            `;
+
+			const phase2Call = await retryWithBackoff(() =>
+				groq.chat.completions.create({
+					messages: [{ role: "user", content: phase2Prompt }],
+					model: "openai/gpt-oss-120b",
+				})
+			);
+
+			const phase2Text = phase2Call.choices[0]?.message?.content || "";
+			const phase2Json = phase2Text.replace(/```json|```/g, "").trim();
+			const batchDetails = JSON.parse(phase2Json);
+
+			Object.assign(enrichedDetails, batchDetails);
+		}
+		console.timeEnd("PHASE_2_ENRICHMENT");
+
+		// ============ Merge Structure + Details ============
+		const nodesWithPos = structure.nodes.map((node, index) => {
+			const details = enrichedDetails[node.id] || {};
+			const rawStatus = node.status || "locked";
 			const status = rawStatus.toLowerCase();
 
 			return {
-				...node,
 				id: node.id || `node-${index}`,
 				type: "topic",
-				position: node.position || { x: 0, y: index * 100 },
+				position: { x: 0, y: index * 100 },
 				data: {
-					...node.data,
+					label: node.label,
+					description: details.description || "",
+					estimatedTime: details.estimatedTime || "TBD",
+					resources: details.resources || [],
+					projectIdea: details.projectIdea || "",
 				},
-				status: ["completed", "pending", "locked"].includes(status)
-					? status
-					: "locked",
+				status: ["completed", "pending", "locked"].includes(status) ? status : "locked",
 			};
 		});
 
@@ -189,7 +226,7 @@ resumeRouter.post("/analyse", upload.single("resume"), async (req, res) => {
 			domain: `Resume Analysis: ${domain}`,
 			type: "resume",
 			nodes: nodesWithPos,
-			edges: graphData.edges,
+			edges: structure.edges,
 		});
 
 		await newRoadmap.save();

@@ -1,10 +1,27 @@
-import { GoogleGenAI } from "@google/genai";
+import Groq from "groq-sdk";
 import axios from "axios";
 import { Router } from "express";
 import { roadmapModel } from "../db/db.js";
 
 const ossRouter = Router();
-const ai = new GoogleGenAI({});
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+// Retry helper with exponential backoff for 503 errors
+const retryWithBackoff = async (fn, retries = 3, delay = 1000) => {
+	for (let i = 0; i < retries; i++) {
+		try {
+			return await fn();
+		} catch (error) {
+			if (error.status === 503 && i < retries - 1) {
+				console.log(`Retry ${i + 1}/${retries} after ${delay}ms...`);
+				await new Promise((r) => setTimeout(r, delay));
+				delay *= 2;
+			} else {
+				throw error;
+			}
+		}
+	}
+};
 
 const fetchRepoFile = async (owner, repo, path) => {
 	try {
@@ -63,9 +80,11 @@ ossRouter.post("/decode", async (req, res) => {
 			});
 		}
 
-		const prompt = `
+		// ============ PHASE 1: Analyze Repo & Generate Structure ============
+		console.time("PHASE_1_STRUCTURE");
+		const phase1Prompt = `
             Act as a Senior Technical Architect and Open Source Maintainer.
-            I want to understand the architecture and tech stack of a specific project so I can contribute to it or replicate it.
+            I want to understand the architecture and tech stack of a specific project.
 
             --- PROJECT CONTEXT ---
             **Language:** ${language}
@@ -74,50 +93,21 @@ ossRouter.post("/decode", async (req, res) => {
             "${manifestContent}"
 
             --- INSTRUCTIONS ---
-            1. **Analyze the Dependencies:** - Identify the core "Runtime" stack (e.g., Frameworks, ORMs, State Management, API clients).
-            - **IGNORE** standard build tools, linters, and testing libraries (e.g., ignoring nodemon, eslint, prettier, jest, webpack) unless they are central to the architecture (like Vite or Next.js).
+            1. **Analyze the Dependencies:** - Identify the core "Runtime" stack (Frameworks, ORMs, State Management, API clients).
+            - **IGNORE** standard build tools, linters, and testing libraries unless central to architecture.
             
-            2. **Reverse Engineer the Architecture:**
-            - Based on the dependencies, deduce the likely architecture (e.g., "This uses Redux for state and Axios for API," or "This uses Gin for routing and Gorm for DB").
+            2. **Construct a LIGHTWEIGHT Learning Roadmap (DAG)**:
+            - **Root Node:** The main language (e.g., "${language}"). Status: "completed".
+            - **Child Nodes:** Critical libraries/frameworks. Status: "pending".
+            - Keep it lightweight - details come later.
             
-            3. **Construct a Learning Roadmap (DAG):**
-            - **Root Node:** The main language (e.g., "${language}"). Mark status as "completed" (assume I know the syntax).
-            - **Child Nodes:** The critical libraries/frameworks identified in step 1. Mark status as "pending".
-            - **Descriptions:** Do not just define the library. Explain *why* it is likely used in this specific repo (e.g., instead of "Zod is a validation lib", say "Zod: Likely used to validate API request schemas").
+            3. Return ONLY valid JSON. No markdown.
             
-            4. **Time Estimation:**
-            - Estimate how long it takes to learn enough of this tool to understand the codebase (e.g., "2 days", "4 hours").
-
-            --- JSON RESPONSE FORMAT ---
-            Return ONLY a valid JSON object. No markdown formatting.
+            JSON FORMAT:
             {
                 "nodes": [
-                    { 
-                        "id": "1", 
-                        "type": "topic", 
-                        "data": { 
-                            "label": "${language} Core", 
-                            "estimatedTime": "0 hours",
-							"resources": [{ "title": "Docs", "url": "https://..." }],
-                            "description": "The fundamental language syntax.",
-							"projectIdea": "Build a Todo App",
-                        },
-                        "status": "completed",
-                        "position": { "x": 0, "y": 0 }
-                    },
-                    { 
-                        "id": "2", 
-                        "type": "topic", 
-                        "data": { 
-                            "label": "Express.js", 
-                            "estimatedTime": "3 Days",
-							"resources": [{ "title": "Docs", "url": "https://..." }],
-                            "description": "Main web server framework handling routes and middleware.",
-							"projectIdea": "Build a Todo App",
-                        },
-                        "status": "pending",
-                        "position": { "x": 0, "y": 100 }
-                    }
+                    { "id": "1", "label": "${language} Core", "status": "completed" },
+                    { "id": "2", "label": "Express.js", "status": "pending" }
                 ],
                 "edges": [
                     { "id": "e1-2", "source": "1", "target": "2" }
@@ -125,19 +115,79 @@ ossRouter.post("/decode", async (req, res) => {
             }
         `;
 
-		const apiCall = await ai.models.generateContent({
-			model: "gemini-2.5-flash",
-			contents: prompt,
+		const phase1Call = await retryWithBackoff(() =>
+			groq.chat.completions.create({
+				messages: [{ role: "user", content: phase1Prompt }],
+				model: "openai/gpt-oss-120b",
+			})
+		);
+
+		const phase1Text = phase1Call.choices[0]?.message?.content || "";
+		const phase1Json = phase1Text.replace(/```json|```/g, "").trim();
+		const structure = JSON.parse(phase1Json);
+		console.timeEnd("PHASE_1_STRUCTURE");
+
+		// ============ PHASE 2: Enrich Nodes in Batches ============
+		console.time("PHASE_2_ENRICHMENT");
+		const BATCH_SIZE = 5;
+		const enrichedDetails = {};
+
+		for (let i = 0; i < structure.nodes.length; i += BATCH_SIZE) {
+			const batch = structure.nodes.slice(i, i + BATCH_SIZE);
+			const batchLabels = batch.map((n) => `- ID: ${n.id}, Topic: ${n.label}`).join("\n");
+
+			const phase2Prompt = `
+                You are enriching roadmap nodes for understanding the repo: ${owner}/${repo} (${language}).
+                
+                For each topic below, explain *why* it is likely used in this specific repo.
+                
+                TOPICS:
+                ${batchLabels}
+                
+                Return ONLY valid JSON. No markdown.
+                Format:
+                {
+                    "<id>": {
+                        "description": "Explain *why* it is used in this repo (e.g. 'Likely used to validate API request schemas')",
+                        "estimatedTime": "Time to learn enough to understand the codebase (e.g. 2 days, 4 hours)",
+                        "resources": [{ "title": "Docs", "url": "https://..." }],
+                        "projectIdea": "A practical project to apply this"
+                    }
+                }
+            `;
+
+			const phase2Call = await retryWithBackoff(() =>
+				groq.chat.completions.create({
+					messages: [{ role: "user", content: phase2Prompt }],
+					model: "openai/gpt-oss-120b",
+				})
+			);
+
+			const phase2Text = phase2Call.choices[0]?.message?.content || "";
+			const phase2Json = phase2Text.replace(/```json|```/g, "").trim();
+			const batchDetails = JSON.parse(phase2Json);
+
+			Object.assign(enrichedDetails, batchDetails);
+		}
+		console.timeEnd("PHASE_2_ENRICHMENT");
+
+		// ============ Merge Structure + Details ============
+		const nodesWithPos = structure.nodes.map((node, index) => {
+			const details = enrichedDetails[node.id] || {};
+			return {
+				id: node.id,
+				type: "topic",
+				data: {
+					label: node.label,
+					description: details.description || "",
+					estimatedTime: details.estimatedTime || "TBD",
+					resources: details.resources || [],
+					projectIdea: details.projectIdea || "",
+				},
+				status: node.status || "pending",
+				position: { x: 0, y: 0 },
+			};
 		});
-
-		const text = apiCall.text;
-		const jsonString = text.replace(/```json|```/g, "").trim();
-		const graphData = JSON.parse(jsonString);
-
-		const nodesWithPos = graphData.nodes.map((node, index) => ({
-			...node,
-			position: { x: 0, y: 0 },
-		}));
 
 		const newRoadmap = new roadmapModel({
 			user: userId,
@@ -146,7 +196,7 @@ ossRouter.post("/decode", async (req, res) => {
 			type: "oss",
 			language: language,
 			nodes: nodesWithPos,
-			edges: graphData.edges,
+			edges: structure.edges,
 		});
 
 		await newRoadmap.save();
