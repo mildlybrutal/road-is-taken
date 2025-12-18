@@ -1,6 +1,6 @@
 # Road Is Taken
 
-**Road Is Taken** is an intelligent, personalized learning roadmap generator designed to help developers master new technologies. Unlike static tutorials, this application uses Google's Gemini GenAI to create dynamic Directed Acyclic Graphs (DAGs) tailored to your specific needs. It features three distinct modes for generating roadmaps: tailored to your current skills, based on an open-source repository, or derived from your resume.
+**Road Is Taken** is an intelligent, personalized learning roadmap generator designed to help developers master new technologies. Unlike static tutorials, this application uses Groq AI to create dynamic Directed Acyclic Graphs (DAGs) tailored to your specific needs. It features three distinct modes for generating roadmaps: tailored to your current skills, based on an open-source repository, or derived from your resume.
 
 ## Key Features
 
@@ -20,7 +20,7 @@
 
 ### 2. AI-Powered & Context-Aware
 
-*   **Google Gemini Integration:** Acts as a "Senior Engineering Mentor" to break down complex topics into manageable nodes.
+*   **Groq AI Integration:** Acts as a "Senior Engineering Mentor" to break down complex topics into manageable nodes.
 *   **Smart Skipping:** Syncs with your GitHub profile to verify your existing skills and automatically marks relevant roadmap nodes as "Completed," allowing you to focus on what's new.
 
 ### 3. Interactive Roadmap UI
@@ -44,7 +44,7 @@
 ### Backend
 *   **Runtime:** Node.js, Express.js
 *   **Database:** MongoDB (Mongoose)
-*   **AI:** Google Gemini SDK (`gemini-2.5-flash`)
+*   **AI:** Groq SDK
 *   **File Processing:** `pdf2json` (for Resume parsing)
 *   **Authentication:** JWT & Bcrypt
 *   **Validation:** Zod
@@ -54,7 +54,7 @@
 ### Prerequisites
 *   Node.js (v18+)
 *   MongoDB (Local or Atlas)
-*   Google Gemini API Key
+*   Groq API Key
 
 ### 1. Clone the Repository
 ```bash
@@ -74,16 +74,10 @@ Create a `.env` file in the `backend` directory:
 ```env
 MONGODB_URI=your_mongodb_connection_string
 JWT_USER_PASSWORD=your_jwt_secret
-GEMINI_API_KEY=your_google_genai_key
+GROQ_API_KEY=your_groq_api_key
 GITHUB_TOKEN=your_github_token
 ```
 *Note: GITHUB_TOKEN is required for OSS mode repository analysis.*
-
-**Seed the Database:**
-Populate initial data:
-```bash
-node seed.js
-```
 
 **Start the Server:**
 ```bash
@@ -126,3 +120,7 @@ npm run dev
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
 | `GET` | `/api/v1/fetchGithub/username` | Analyzes GitHub repos to update verified skills and smart-skip roadmap nodes. |
+
+## Credits
+
+*   **Background Pattern:** [PatternCraft](https://www.patterncraft.io/)
