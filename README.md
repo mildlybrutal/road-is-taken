@@ -123,4 +123,4 @@ npm run dev
 
 ## Credits
 
-*   **Background Pattern:** [PatternCraft](https://www.patterncraft.io/)
+*   **Background Pattern:** [PatternCraft](https://patterncraft.fun/)
